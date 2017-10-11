@@ -4,6 +4,7 @@ import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
@@ -16,12 +17,14 @@ import android.os.ParcelUuid;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.widget.Toast;
-import static ch.ethz.inf.vs.a1.jvkalle.ble.SensirionSHT31UUIDS.*;
+
+
+
 import java.util.ArrayList;
 
 import java.util.List;
 import static android.content.ContentValues.TAG;
-import static android.support.v4.app.ActivityCompat.startActivityForResult;
+
 import static ch.ethz.inf.vs.a1.jvkalle.ble.MainActivity.REQUEST_ENABLE_BT;
 
 
@@ -45,24 +48,16 @@ public class BleService extends Service {
         }
     }
 
-    public boolean initialize() {
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show();
-
-        } else {
-            final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-            mBluetoothAdapter = bluetoothManager.getAdapter();
-            if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-            }
-        }
+    public void initialize() {
+        mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        mBluetoothAdapter = mBluetoothManager.getAdapter();
     }
 
 
 
 
-    public boolean startScan(final BleCallback callback, final long durationMs,final String[] ServiceUuid, final String[] DeviceName) {
+    public boolean startScan(final ScanCallback callback, final long durationMs,
+                             final String[] ServiceUuid, final String[] DeviceName) {
 
             final ScanSettings settings = new ScanSettings.Builder()
                     .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -76,22 +71,24 @@ public class BleService extends Service {
             }
         };
         mScanHandler.postDelayed(mStopScanningRunnable, durationMs);
-        mBluetoothLeScanner.startScan(filtefinal List<rs, settings, callback);
+        final List<ScanFilter> filterList = getScanFilters(DeviceName,ServiceUuid)
+        mBluetoothLeScanner.startScan(filterList, settings, callback);
+
         return true;
         }
 
-    private List<ScanFilter> getScanFilters(final String[] DeviceNameFilter, final String[] ServiceUuidFilter) {
+    private List<ScanFilter> getScanFilters(final String[] DeviceName, final String[] ServiceUuid) {
         final List<ScanFilter> filters = new ArrayList<>();
-        if (DeviceNameFilter != null) {
-            for (String deviceName : DeviceNameFilter) {
+        if (DeviceName != null) {
+            for (String deviceName : DeviceName) {
                 final ScanFilter scanFilter = new ScanFilter.Builder()
                         .setDeviceName(deviceName)
                         .build();
                 filters.add(scanFilter);
             }
         }
-        if (ServiceUuidFilter != null) {
-            for (String uuidSString : ServiceUuidFilter) {
+        if (ServiceUuid != null) {
+            for (String uuidSString : ServiceUuid) {
                 final ScanFilter scanFilter = new ScanFilter.Builder()
                         .setServiceUuid(ParcelUuid.fromString(uuidSString))
                         .build();
