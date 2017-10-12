@@ -1,4 +1,4 @@
-package ch.ethz.inf.vs.a1.nethz.ble;
+package ch.ethz.inf.vs.a1.jvkalle.ble;
 
 import java.util.UUID;
 

@@ -2,37 +2,34 @@ package ch.ethz.inf.vs.a1.jvkalle.ble;
 
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.ParcelUuid;
-import android.support.annotation.NonNull;
-import android.util.Log;
-import android.widget.Toast;
-
-
-
 import java.util.ArrayList;
-
 import java.util.List;
-import static android.content.ContentValues.TAG;
+import java.util.concurrent.ConcurrentHashMap;
 
-import static ch.ethz.inf.vs.a1.jvkalle.ble.MainActivity.REQUEST_ENABLE_BT;
+import static android.bluetooth.BluetoothProfile.STATE_CONNECTED;
+import static android.bluetooth.BluetoothProfile.STATE_DISCONNECTED;
 
 
 public class BleService extends Service {
-
-
     private final Handler mScanHandler = new Handler();
     private final IBinder mBinder = new LocalBinder();
+    private ConcurrentHashMap<String, BleDevice> mDevices;
+    private final BluetoothGattCallback mGattCallback = new BleCallback();
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -53,9 +50,6 @@ public class BleService extends Service {
         mBluetoothAdapter = mBluetoothManager.getAdapter();
     }
 
-
-
-
     public boolean startScan(final ScanCallback callback, final long durationMs,
                              final String[] ServiceUuid, final String[] DeviceName) {
 
@@ -71,11 +65,60 @@ public class BleService extends Service {
             }
         };
         mScanHandler.postDelayed(mStopScanningRunnable, durationMs);
-        final List<ScanFilter> filterList = getScanFilters(DeviceName,ServiceUuid)
-        mBluetoothLeScanner.startScan(filterList, settings, callback);
-
+        mBluetoothLeScanner.startScan(filters, settings, callback);
         return true;
         }
+
+
+
+
+
+    public boolean connect(final String deviceAddress) {
+        if (mBluetoothAdapter == null) {
+            return false;
+        }
+        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(deviceAddress);
+        if (device == null) {
+            return false;
+        }
+        final BluetoothGatt mBluetoothGatt = device.connectGatt(this, false, mGattCallback);
+        mDevices.put(deviceAddress, new BleDevice(mBluetoothGatt, BluetoothProfile.STATE_CONNECTING));
+        return true;
+    }
+
+    class BleCallback extends BluetoothGattCallback {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            final String deviceAddress = gatt.getDevice().getAddress();
+            final BleDevice mBleDevice = mDevices.get(deviceAddress);
+            if (mBleDevice == null) return;
+
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                mBleDevice.setConnectionState(newState);
+
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                mBleDevice.setConnectionState(newState);
+                mBleDevice.getBluetoothGatt().close();
+                mDevices.remove(deviceAddress);
+            }
+        }
+    }
+
+
+
+
+            public void disconnect(final String deviceAddress) {
+        final BleDevice bleDevice = mDevices.get(deviceAddress);
+        bleDevice.getBluetoothGatt().disconnect();
+    }
+
+
+
+
+        List<BluetoothDevice> devices = mBluetoothManager.getConnectedDevices(BluetoothProfile.GATT);
+
+
+
 
     private List<ScanFilter> getScanFilters(final String[] DeviceName, final String[] ServiceUuid) {
         final List<ScanFilter> filters = new ArrayList<>();
